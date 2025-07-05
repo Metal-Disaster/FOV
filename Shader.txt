@@ -1,0 +1,105 @@
+local lighting = game:GetService("Lighting")
+
+getgenv().ShaderData = {
+	originalSettings = {},
+	originalEffects = {},
+	loopRunning = false,
+	thread = nil
+}
+
+local data = getgenv().ShaderData
+
+function data.backupOriginal()
+	data.originalSettings = {
+		Ambient = lighting.Ambient,
+		OutdoorAmbient = lighting.OutdoorAmbient,
+		Brightness = lighting.Brightness,
+		GlobalShadows = lighting.GlobalShadows,
+		EnvironmentDiffuseScale = lighting.EnvironmentDiffuseScale,
+		EnvironmentSpecularScale = lighting.EnvironmentSpecularScale,
+		Technology = lighting.Technology,
+	}
+
+	data.originalEffects = {}
+	for _, effect in pairs(lighting:GetChildren()) do
+		if effect:IsA("PostEffect") and not effect.Name:match("^Shader_") then
+			table.insert(data.originalEffects, effect:Clone())
+		end
+	end
+end
+
+function data.applyLoop()
+	while data.loopRunning do
+		for _, v in pairs(lighting:GetChildren()) do
+			if v:IsA("PostEffect") and not v.Name:match("^Shader_") then
+				v.Enabled = false
+			end
+		end
+
+		lighting.Technology = Enum.Technology.Future
+		lighting.Ambient = Color3.fromRGB(150, 150, 150)
+		lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120)
+		lighting.Brightness = 1
+		lighting.GlobalShadows = true
+		lighting.EnvironmentDiffuseScale = 1.5
+		lighting.EnvironmentSpecularScale = 1.5
+
+		local function createOrUpdate(className, name, props)
+			local fx = lighting:FindFirstChild(name)
+			if not fx then
+				fx = Instance.new(className)
+				fx.Name = name
+				fx.Parent = lighting
+			end
+			for prop, val in pairs(props) do
+				fx[prop] = val
+			end
+		end
+
+		createOrUpdate("BloomEffect", "Shader_Bloom", {
+			Intensity = 0.5,
+			Size = 24,
+			Threshold = 1
+		})
+
+		createOrUpdate("BlurEffect", "Shader_Blur", {
+			Size = 2
+		})
+
+		createOrUpdate("ColorCorrectionEffect", "Shader_CC", {
+			Brightness = 0.1,
+			Contrast = 0.2,
+			Saturation = 0.15
+		})
+
+		createOrUpdate("SunRaysEffect", "Shader_SunRays", {
+			Intensity = 0.15,
+			Spread = 1
+		})
+
+		createOrUpdate("DepthOfFieldEffect", "Shader_DOF", {
+			FarIntensity = 0.08,
+			FocusDistance = 50,
+			NearIntensity = 0.1
+		})
+
+		game:GetService("RunService").Heartbeat:Wait()
+	end
+end
+
+function data.restore()
+	for prop, val in pairs(data.originalSettings) do
+		lighting[prop] = val
+	end
+
+	for _, v in pairs(lighting:GetChildren()) do
+		if v:IsA("PostEffect") and v.Name:match("^Shader_") then
+			v:Destroy()
+		end
+	end
+
+	for _, effect in pairs(data.originalEffects) do
+		local restored = effect:Clone()
+		restored.Parent = lighting
+	end
+end
