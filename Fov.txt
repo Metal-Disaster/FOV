@@ -1,0 +1,66 @@
+local RunService = game:GetService("RunService")
+
+getgenv().FovController = getgenv().FovController or {
+	FovValue = 70,
+	FovLocked = false,
+	IsAdjustingSlider = false,
+	OriginalFov = nil,
+	PropertyChangedConnection = nil,
+	HeartbeatConnection = nil
+}
+
+local controller = getgenv().FovController
+
+controller.SetFov = function(value)
+	controller.FovValue = value
+	controller.IsAdjustingSlider = true
+
+	if not controller.FovLocked and workspace.CurrentCamera then
+		workspace.CurrentCamera.FieldOfView = value
+	end
+
+	task.delay(0.1, function()
+		controller.IsAdjustingSlider = false
+	end)
+end
+
+controller.ToggleLock = function(state)
+	controller.FovLocked = state
+
+	if controller.FovLocked and workspace.CurrentCamera then
+		workspace.CurrentCamera.FieldOfView = controller.FovValue
+		controller.OriginalFov = controller.FovValue
+
+		if controller.PropertyChangedConnection then
+			controller.PropertyChangedConnection:Disconnect()
+		end
+		controller.PropertyChangedConnection = workspace.CurrentCamera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+			if controller.FovLocked then
+				workspace.CurrentCamera.FieldOfView = controller.OriginalFov
+			end
+		end)
+
+		if not controller.HeartbeatConnection then
+			controller.HeartbeatConnection = RunService.Heartbeat:Connect(function()
+				if controller.FovLocked and workspace.CurrentCamera and not controller.IsAdjustingSlider then
+					workspace.CurrentCamera.FieldOfView = controller.FovValue
+				end
+			end)
+		end
+	else
+		if controller.PropertyChangedConnection then
+			controller.PropertyChangedConnection:Disconnect()
+			controller.PropertyChangedConnection = nil
+		end
+		if controller.HeartbeatConnection then
+			controller.HeartbeatConnection:Disconnect()
+			controller.HeartbeatConnection = nil
+		end
+	end
+end
+
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+	if controller.FovLocked and workspace.CurrentCamera then
+		workspace.CurrentCamera.FieldOfView = controller.FovValue
+	end
+end)
